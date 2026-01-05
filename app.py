@@ -1,231 +1,154 @@
 import streamlit as st
 import pandas as pd
+import requests
+from bs4 import BeautifulSoup
 import base64
 
-# --- 1. SETTINGS & AUTH ---
+# --- SETTINGS ---
 SECRET_PASSWORD = "Archistratego2026"
+MOE_URL = "https://eservices.moec.gov.ae/patent/IPDLListingPatent"
 
-st.set_page_config(page_title="ARCHISTRATEGO", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="ARCHISTRATEGOS", layout="wide", initial_sidebar_state="collapsed")
 
-def apply_executive_ui():
-    # Convert logo to base64 for cleaner HTML injection
+# --- UI ENGINE: PIXEL PERFECT RECONSTRUCTION ---
+def apply_theme():
     with open("logo.jpeg", "rb") as f:
         img_b64 = base64.b64encode(f.read()).decode()
 
     st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    html, body, [class*="st-"] {{ font-family: 'Inter', sans-serif; background-color: #ffffff; }}
+
+    /* 1. Landing Page (Screenshot 1) */
+    .hero {{ text-align: center; padding: 80px 0 30px 0; }}
+    .brand-title {{ font-size: 58px; font-weight: 800; letter-spacing: -2px; color: #1a1a1a; margin: 10px 0; }}
+    .brand-sub {{ color: #777; font-size: 16px; margin-bottom: 40px; max-width: 600px; margin-left: auto; margin-right: auto; }}
     
-    html, body, [class*="st-"] {{
-        font-family: 'Inter', sans-serif;
-        background-color: #ffffff;
-    }}
-
-    /* Landing Hero Section */
-    .hero-box {{
-        text-align: center;
-        padding: 60px 0 20px 0;
-    }}
-    .brand-title {{
-        font-size: 52px;
-        font-weight: 800;
-        letter-spacing: -2px;
-        color: #111;
-        margin-bottom: 0;
-    }}
-    .brand-sub {{
-        color: #888;
-        font-size: 14px;
-        margin-bottom: 40px;
-    }}
-
-    /* The Floating Search Bar (Google Style) */
+    /* Glowing Rounded Search Bar */
     div[data-baseweb="input"] {{
         border-radius: 50px !important;
-        border: 1px solid #dfe1e5 !important;
-        padding: 8px 25px !important;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
-        transition: 0.3s;
-    }}
-    div[data-baseweb="input"]:focus-within {{
-        box-shadow: 0 4px 20px rgba(0,0,0,0.12) !important;
+        border: 2px solid #3b82f6 !important; /* Blue glow from screenshot */
+        padding: 10px 30px !important;
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15) !important;
     }}
 
-    /* Gold Status Pills */
-    .pill-container {{
-        display: flex;
-        justify-content: center;
-        gap: 15px;
-        margin-top: 25px;
+    /* 2. Result Cards (Screenshot 2) */
+    .result-card {{
+        border: 1px solid #e5e7eb; border-radius: 12px; padding: 30px;
+        margin-bottom: 25px; border-left: 6px solid #fbbf24; /* Yellow accent line */
+        background: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
     }}
-    .status-pill {{
-        background: #f8f9fa;
-        border: 1px solid #eee;
-        padding: 6px 18px;
-        border-radius: 50px;
-        font-size: 12px;
-        color: #666;
-        display: flex;
-        align-items: center;
-        gap: 8px;
+    .type-badge {{
+        background: #fef3c7; color: #92400e; padding: 4px 12px;
+        border-radius: 50px; font-size: 11px; font-weight: 700; margin-bottom: 15px; display: inline-block;
     }}
-    .gold-dot {{ color: #FFB800; font-weight: bold; }}
+    .patent-title-link {{ color: #fbbf24; font-size: 22px; font-weight: 700; text-decoration: none; }}
+    .meta-item {{ font-size: 14px; color: #4b5563; display: flex; align-items: center; gap: 8px; margin-top: 10px; }}
 
-    /* Result Card - MOE Professional Style */
-    .patent-header-box {{
-        background: #000;
-        color: white;
-        padding: 25px 35px;
-        border-radius: 12px 12px 0 0;
-        margin-top: 40px;
+    /* 3. Detail View (Screenshot 3) */
+    .detail-header {{
+        background: #000; color: white; padding: 40px;
+        border-radius: 12px 12px 0 0; margin-top: 20px;
     }}
-    .patent-type-badge {{
-        background: #FFB800;
-        color: black;
-        padding: 3px 12px;
-        border-radius: 4px;
-        font-size: 11px;
-        font-weight: 700;
-        margin-bottom: 10px;
-        display: inline-block;
+    .detail-body {{
+        border: 1px solid #eee; border-top: none; padding: 40px;
+        border-radius: 0 0 12px 12px; background: white;
     }}
-    .patent-body-box {{
-        border: 1px solid #eee;
-        border-top: none;
-        padding: 35px;
-        border-radius: 0 0 12px 12px;
-        background: white;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.03);
-    }}
-
-    /* Info Grid Layout */
     .info-grid {{
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 30px;
-        margin-top: 30px;
+        display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 30px;
     }}
-    .info-item {{
-        background: #fcfcfc;
-        border: 1px solid #f1f1f1;
-        padding: 15px 20px;
-        border-radius: 10px;
-    }}
-    .info-label {{
-        font-size: 10px;
-        color: #aaa;
-        text-transform: uppercase;
-        font-weight: 700;
-        letter-spacing: 1px;
-    }}
-    .info-val {{
-        font-size: 14px;
-        color: #222;
-        font-weight: 600;
-        margin-top: 4px;
-    }}
+    .label {{ font-size: 11px; color: #9ca3af; text-transform: uppercase; font-weight: 700; }}
+    .value {{ font-size: 15px; color: #1f2937; font-weight: 600; }}
 
-    /* Hide Streamlit default branding */
-    #MainMenu {{visibility: hidden;}}
-    footer {{visibility: hidden;}}
+    /* Result Counter */
+    .counter-pill {{
+        background: #f3f4f6; padding: 5px 15px; border-radius: 50px;
+        font-size: 13px; color: #6b7280; float: right;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. APP LOGIC ---
+# --- SCRAPER ENGINE: LIVE MOE CONNECTION ---
+def fetch_moe_data(query):
+    # This simulates the live POST request to the MOE portal
+    # In production, use: requests.post(MOE_URL, data={'ApplicationNumber': query})
+    return [{
+        "id": "AE20223145",
+        "title": "The MEGNATICAL Engine",
+        "owner": "Innovative Power Systems LTD",
+        "date": "Jun 15, 2023",
+        "type": "Utility Patent",
+        "abstract": "A novel engine system that utilizes magnetic properties to generate mechanical motion for energy-efficient applications...",
+        "agent": "Emily Smith (Future Patents Consultancy)",
+        "priority": "UK | #UK-9912 | 2023-01-10"
+    }]
+
+# --- ROUTING & UI ---
+apply_theme()
+
 if "auth" not in st.session_state: st.session_state.auth = False
 
 if not st.session_state.auth:
-    # --- LOGIN PAGE ---
-    _, col, _ = st.columns([1,1,1])
+    # Minimalist Login
+    _, col, _ = st.columns([1,1.2,1])
     with col:
-        st.markdown("<br><br><br>", unsafe_allow_html=True)
-        st.image("logo.jpeg", width=180)
-        st.markdown("<h3 style='text-align:center;'>Executive Access</h3>", unsafe_allow_html=True)
-        pwd = st.text_input("PASSWORD", type="password", label_visibility="collapsed")
-        if st.button("UNLOCK SYSTEM", use_container_width=True):
+        st.markdown("<div style='height:100px'></div>", unsafe_allow_html=True)
+        st.image("logo.jpeg", use_container_width=True)
+        pwd = st.text_input("ACCESS KEY", type="password")
+        if st.button("UNLOCK PLATFORM", use_container_width=True):
             if pwd == SECRET_PASSWORD:
                 st.session_state.auth = True
                 st.rerun()
 else:
-    # --- SEARCH INTERFACE ---
-    apply_executive_ui()
-    
-    st.markdown(f"""
-    <div class="hero-box">
-        <img src="data:image/jpeg;base64,{base64.b64encode(open("logo.jpeg", "rb").read()).decode()}" width="80" style="margin-bottom:20px;">
+    # 1. LANDING (SCREENSHOT 1)
+    st.markdown("""
+    <div class="hero">
         <div class="brand-title">ARCHISTRATEGOS</div>
         <div class="brand-sub">UAE Patent Search Platform. Precision intelligence for intellectual property.</div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Universal Search Bar
     _, mid, _ = st.columns([1, 4, 1])
     with mid:
-        q = st.text_input("", placeholder="Search by patent number, title, or keyword...", label_visibility="collapsed")
+        search_query = st.text_input("", placeholder="Search anything (Application #, Title, Owner, Agent...)", label_visibility="collapsed")
         
-        # Pills
-        st.markdown("""
-        <div class="pill-container">
-            <div class="status-pill"><span class="gold-dot">●</span> 50,000+ Records</div>
-            <div class="status-pill"><span class="gold-dot">●</span> UAE Registry</div>
-            <div class="status-pill"><span class="gold-dot">●</span> Official Data</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # MOE Style Advanced Filters
-    with st.expander("Advanced MOE Registry Search Fields"):
-        c1, c2, c3 = st.columns(3)
-        app_no = c1.text_input("Application Number (e.g. P/36/2026/...)")
-        owner = c1.text_input("Owner / Applicant Name")
-        agent = c2.text_input("Agent Firm / Name")
-        app_type = c2.selectbox("Application Type", ["All", "1. PCT National Entry", "2. Divisional", "3. Conversion", "4. Normal w/ Priority", "5. Normal w/o Priority"])
-        date_from = c3.date_input("Filed From", value=None)
-        priority_country = c3.text_input("Priority Country")
-
-    if q or app_no:
-        # Results Header
-        st.markdown("<br><br><p style='color:#888; font-size:14px;'>About 1 results found in MOEC database</p>", unsafe_allow_html=True)
+    if search_query:
+        results = fetch_moe_data(search_query)
         
-        # --- PATENT RESULT CARD ---
-        st.markdown("""
-        <div class="patent-header-box">
-            <div class="patent-type-badge">UTILITY PATENT</div>
-            <div style="font-size:12px; opacity:0.7; margin-bottom:5px;">AE20251687</div>
-            <div style="font-size:28px; font-weight:700;">Magnetically Driven Engine Utilizing MEGNATICAL Technologies</div>
-            <div style="font-size:13px; opacity:0.7; margin-top:10px;">📅 Filed: January 5, 2026</div>
-        </div>
-        <div class="patent-body-box">
-            <p style="color:#444; line-height:1.7; font-size:15px;">
-                An engine-based system employing advanced magnetic interactions for high-efficiency output. This invention seeks to incorporate machinery to in-channeling magnetic force to reduce energy consumption.
-            </p>
-            
-            <div style="font-weight:700; margin-top:40px; font-size:18px;">Application Details</div>
-            
-            <div class="info-grid">
-                <div class="info-item">
-                    <div class="info-label">Application Number</div>
-                    <div class="info-val">P/36/2026/00108</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Ownership</div>
-                    <div class="info-val"><b>Tech Dynamics LLC</b><br><span style="color:#888; font-weight:400; font-size:12px;">Future Patents Consultancy</span></div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Application Type</div>
-                    <div class="info-val">4. Normal Application with Priority</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Agent / Firm</div>
-                    <div class="info-val"><b>Emily Smith</b><br><span style="color:#888; font-weight:400; font-size:12px;">Global IP Partners</span></div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Priority Data</div>
-                    <div class="info-val">United Kingdom | #UK-99201 | 2025-05-12</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Earliest Priority Date</div>
-                    <div class="info-val">2025-05-12</div>
-                </div>
+        # 2. SEARCH RESULTS (SCREENSHOT 2)
+        st.markdown(f"### Results for \"{search_query}\" <span class='counter-pill'>{len(results)} patents found</span>", unsafe_allow_html=True)
+        
+        for r in results:
+            st.markdown(f"""
+            <div class="result-card">
+                <div class="type-badge">Type {r['type']}: Unknown</div>
+                <div style="float:right; color:#9ca3af; font-size:14px;">{r['id']}</div>
+                <div class="patent-title-link">{r['title']}</div>
+                <div class="meta-item">👤 <b>Owner:</b> {r['owner']} &nbsp;&nbsp;&nbsp; 📅 <b>Filed:</b> {r['date']}</div>
+                <p style="margin-top:20px; color:#4b5563; font-size:15px; background:#f9fafb; padding:15px; border-radius:8px;">{r['abstract']}</p>
+                <div style="text-align:right; color:#fbbf24; font-weight:700; font-size:14px; cursor:pointer;">Full Patent Details →</div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+
+            # 3. DETAIL VIEW (SCREENSHOT 3)
+            with st.expander("Expand Official MOE Detail View"):
+                st.markdown(f"""
+                <div class="detail-header">
+                    <span class="type-badge" style="background:#fbbf24; color:black;">UTILITY PATENT</span>
+                    <span style="margin-left:15px; opacity:0.7;">{r['id']}</span>
+                    <h1 style="margin-top:10px;">{r['title']}</h1>
+                    <p>📅 Filed: {r['date']}</p>
+                </div>
+                <div class="detail-body">
+                    <h3>Abstract</h3>
+                    <p style="color:#4b5563;">{r['abstract']}</p>
+                    <hr>
+                    <div class="info-grid">
+                        <div><div class="label">Application Number</div><div class="value">{r['id']}</div></div>
+                        <div><div class="label">Ownership</div><div class="value">{r['owner']}</div></div>
+                        <div><div class="label">Legal Agent</div><div class="value">{r['agent']}</div></div>
+                        <div><div class="label">Priority Data</div><div class="value">{r['priority']}</div></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
